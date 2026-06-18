@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Package, RefreshCw, ChevronRight } from 'lucide-react'
+import { Plus, Package, RefreshCw, ChevronRight, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth-store'
 import { fetchOrders } from '@/services/orders-service'
 import type { Order } from '@/types'
@@ -11,6 +12,7 @@ export function OrdersListPage() {
   const user = useAuthStore((s) => s.user)!
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const loadOrders = async () => {
     setLoading(true)
@@ -23,6 +25,18 @@ export function OrdersListPage() {
       setLoading(false)
     }
   }
+
+  const filteredOrders = orders.filter((order) => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      (order.order_number || '').toLowerCase().includes(q) ||
+      (order.title || '').toLowerCase().includes(q) ||
+      (order.customer_name || '').toLowerCase().includes(q) ||
+      (order.oem || '').toLowerCase().includes(q) ||
+      (order.sales_rep_name || '').toLowerCase().includes(q)
+    )
+  })
 
   useEffect(() => {
     loadOrders()
@@ -117,6 +131,21 @@ export function OrdersListPage() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      {!loading && orders.length > 0 && (
+        <div className="bg-card border border-border p-4 rounded-lg shadow-sm flex items-center gap-3">
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by order #, title, customer, OEM, or sales rep..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 border-border text-xs rounded-lg w-full bg-background"
+            />
+          </div>
+        </div>
+      )}
+
       {/* List */}
       {loading ? (
         <div className="bg-card border border-border rounded-lg h-96 animate-pulse shadow-sm" />
@@ -152,69 +181,77 @@ export function OrdersListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40 text-xs">
-                {orders.map((order) => {
-                  const { salesDone, finDone } = getChecklistCount(order)
-                  const dispatchDone = getDispatchCount(order)
-                  const totalChecklist = salesDone + finDone
-                  
-                  return (
-                    <tr
-                      key={order.id}
-                      onClick={() => navigate(`/orders/${order.id}`)}
-                      className="hover:bg-muted/30 cursor-pointer transition-colors group"
-                    >
-                      <td className="p-4 font-bold text-foreground">{order.order_number}</td>
-                      <td className="p-4 font-medium text-foreground">{order.title}</td>
-                      <td className="p-4 text-muted-foreground">{order.customer_name}</td>
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                          {order.oem || 'N/A'}
-                        </span>
-                      </td>
-                      {user.role !== 'sales_rep' && (
-                        <td className="p-4 text-muted-foreground font-medium">{order.sales_rep_name}</td>
-                      )}
-                      <td className="p-4">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground font-semibold">Sales:</span>
-                            <span className={`font-bold ${salesDone === 6 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {salesDone}/6
-                            </span>
-                            <span className="text-slate-300">|</span>
-                            <span className="text-[10px] text-muted-foreground font-semibold">Finance:</span>
-                            <span className={`font-bold ${finDone === 6 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                              {finDone}/6
-                            </span>
-                          </div>
-                          <div className="w-28 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-primary h-full transition-all duration-300"
-                              style={{ width: `${(totalChecklist / 12) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-bold ${dispatchDone === 6 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                            {dispatchDone}/6 stages
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={user.role === 'sales_rep' ? 7 : 8} className="p-8 text-center text-muted-foreground italic bg-muted/5">
+                      No orders matching your search query.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.map((order) => {
+                    const { salesDone, finDone } = getChecklistCount(order)
+                    const dispatchDone = getDispatchCount(order)
+                    const totalChecklist = salesDone + finDone
+                    
+                    return (
+                      <tr
+                        key={order.id}
+                        onClick={() => navigate(`/orders/${order.id}`)}
+                        className="hover:bg-muted/30 cursor-pointer transition-colors group"
+                      >
+                        <td className="p-4 font-bold text-foreground">{order.order_number}</td>
+                        <td className="p-4 font-medium text-foreground">{order.title}</td>
+                        <td className="p-4 text-muted-foreground">{order.customer_name}</td>
+                        <td className="p-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                            {order.oem || 'N/A'}
                           </span>
-                          {dispatchDone > 0 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                              Shipped
+                        </td>
+                        {user.role !== 'sales_rep' && (
+                          <td className="p-4 text-muted-foreground font-medium">{order.sales_rep_name}</td>
+                        )}
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground font-semibold">Sales:</span>
+                              <span className={`font-bold ${salesDone === 6 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {salesDone}/6
+                              </span>
+                              <span className="text-slate-300">|</span>
+                              <span className="text-[10px] text-muted-foreground font-semibold">Finance:</span>
+                              <span className={`font-bold ${finDone === 6 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {finDone}/6
+                              </span>
+                            </div>
+                            <div className="w-28 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="bg-primary h-full transition-all duration-300"
+                                style={{ width: `${(totalChecklist / 12) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold ${dispatchDone === 6 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                              {dispatchDone}/6 stages
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 text-right pr-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
+                            {dispatchDone > 0 && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                Shipped
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-right pr-6">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>

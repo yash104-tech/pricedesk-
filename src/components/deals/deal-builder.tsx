@@ -123,6 +123,8 @@ export function DealBuilder({ initialDeal, onSubmit, isSubmitting }: DealBuilder
   const [newCustomerName, setNewCustomerName] = useState('')
   const [oemSearch, setOemSearch] = useState(initialDeal?.oem ?? '')
   const [showOemSuggestions, setShowOemSuggestions] = useState(false)
+  const [openOverheadIdx, setOpenOverheadIdx] = useState<number | null>(null)
+  const [overheadQuery, setOverheadQuery] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -184,7 +186,7 @@ export function DealBuilder({ initialDeal, onSubmit, isSubmitting }: DealBuilder
             is_percentage: o.is_percentage,
             percentage_value: o.percentage_value ?? undefined,
           }))
-        : [], // Professional empty starting slate for custom overhead charges
+        : [{ label: 'Delivery/Freight', amount: 0, is_percentage: false }],
     },
   })
 
@@ -271,9 +273,22 @@ export function DealBuilder({ initialDeal, onSubmit, isSubmitting }: DealBuilder
     return ((totalRevenue - totalCost) / totalRevenue) * 100
   }, [totalRevenue, totalCost])
 
-  // Get color styles for the margin pill
-  const marginColor = totalRevenue === 0 ? 'text-amber-500' : getMarginColor(netMarginPct)
-  const marginBg = totalRevenue === 0 ? 'bg-amber-500/10 border-amber-500/20' : getMarginBg(netMarginPct)
+  // Get color styles for the margin pill based on teammate's logic
+  const marginColor = totalRevenue === 0
+    ? 'text-amber-500'
+    : netMarginPct <= 8
+    ? 'text-red-500'
+    : netMarginPct <= 20
+    ? 'text-emerald-500'
+    : 'text-blue-500'
+
+  const marginBg = totalRevenue === 0
+    ? 'bg-amber-500/10 border-amber-500/20'
+    : netMarginPct <= 8
+    ? 'bg-red-500/10 border-red-500/20'
+    : netMarginPct <= 20
+    ? 'bg-emerald-500/10 border-emerald-500/20'
+    : 'bg-blue-500/10 border-blue-500/20'
 
   const handleFormSubmit = async (data: DealFormValues) => {
     // Map custom fields to database structure
@@ -904,16 +919,82 @@ export function DealBuilder({ initialDeal, onSubmit, isSubmitting }: DealBuilder
                 ? 'Implementation / Installation Charges'
                 : 'Enter Custom Charge Label'
 
+            const registered = form.register(`overheads.${index}.label`)
+            const currentLabel = openOverheadIdx === index ? overheadQuery : (form.watch(`overheads.${index}.label`) || "")
+            const suggestionsList = ["Delivery/Freight", "Implementation/Installation", "Miscellaneous", "Additional Components/Software", "Others"]
+            const filtered = suggestionsList.filter(opt => opt.toLowerCase().includes(currentLabel.toLowerCase()))
 
             return (
               <div key={field.id} className="flex items-center gap-3 bg-muted/10 p-3 rounded-lg border border-border/60">
                 <div className="flex-1">
-                  <div className="relative">
+                  <div className="relative w-full">
                     <Input
-                      {...form.register(`overheads.${index}.label`)}
+                      {...registered}
+                      onChange={(event) => {
+                        registered.onChange(event)
+                        const val = event.target.value
+                        setOverheadQuery(val)
+                        setOpenOverheadIdx(index)
+                      }}
+                      onFocus={() => {
+                        setOpenOverheadIdx(index)
+                        setOverheadQuery(form.getValues(`overheads.${index}.label`) || "")
+                      }}
+                      onBlur={(event) => {
+                        registered.onBlur(event)
+                        setTimeout(() => setOpenOverheadIdx(null), 200)
+                      }}
                       placeholder={placeholder}
-                      className="h-10 text-[13px] bg-background border-border rounded-md font-medium"
+                      className="h-10 text-[13px] bg-background border-border rounded-md font-medium w-full"
                     />
+                    <AnimatePresence>
+                      {openOverheadIdx === index && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-48 overflow-y-auto"
+                        >
+                          <div className="py-1">
+                            {filtered.map((opt) => (
+                              <button
+                                type="button"
+                                key={opt}
+                                className={cn(
+                                  "w-full text-left px-3 py-2 text-[13px] hover:bg-accent hover:text-accent-foreground transition-colors flex justify-between items-center cursor-pointer",
+                                  opt === "Others" && "font-semibold text-primary border-t border-border mt-1 pt-1"
+                                )}
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  form.setValue(`overheads.${index}.label`, opt === "Others" ? "" : opt, { shouldValidate: true })
+                                  setOverheadQuery(opt === "Others" ? "" : opt)
+                                  setOpenOverheadIdx(null)
+                                }}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                            {currentLabel.trim() && !suggestionsList.some(opt => opt.toLowerCase() === currentLabel.toLowerCase()) && (
+                              <div className="p-1 border-t border-border bg-muted/5">
+                                <button
+                                  type="button"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault()
+                                    form.setValue(`overheads.${index}.label`, currentLabel.trim(), { shouldValidate: true })
+                                    setOverheadQuery(currentLabel.trim())
+                                    setOpenOverheadIdx(null)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-[13px] text-primary hover:bg-primary/10 rounded-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span>Use "{currentLabel.trim()}"</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
                 <div className="w-32 relative">

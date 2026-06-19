@@ -1,4 +1,4 @@
-import type { Order, DealItem, UserRole } from '@/types'
+import type { Order, DealItem, UserRole, OrderIncentiveDetails } from '@/types'
 import { useAuthStore } from '@/stores/auth-store'
 import { db } from '@/lib/firebase'
 import { collection, doc, getDoc, getDocs, setDoc, query, orderBy } from 'firebase/firestore'
@@ -232,7 +232,8 @@ export async function saveOrder(order: Partial<Order> & { items: DealItem[] }, u
       payment_received_sales: false,
       payment_received_finance: false,
       payment_received_remarks: '',
-    }
+    },
+    incentive_details: order.incentive_details ?? null,
   }
 
   if (isDemo) {
@@ -253,6 +254,35 @@ export async function saveOrder(order: Partial<Order> & { items: DealItem[] }, u
     return newOrder
   } catch (e) {
     console.error('Failed to save order to firestore:', e)
+    throw e
+  }
+}
+
+export async function saveIncentiveDetails(
+  orderId: string,
+  details: OrderIncentiveDetails
+): Promise<void> {
+  const isDemo = useAuthStore.getState().isDemo
+
+  if (isDemo) {
+    const list = getMockOrders()
+    const index = list.findIndex((o) => o.id === orderId)
+    if (index !== -1) {
+      list[index] = { ...list[index], incentive_details: details, updated_at: new Date().toISOString() }
+      saveMockOrders(list)
+    }
+    return
+  }
+
+  // Live Firestore update
+  try {
+    const { updateDoc, doc: firestoreDoc } = await import('firebase/firestore')
+    await updateDoc(firestoreDoc(db, 'orders', orderId), {
+      incentive_details: details,
+      updated_at: new Date().toISOString(),
+    })
+  } catch (e) {
+    console.error('Failed to save incentive details to firestore:', e)
     throw e
   }
 }

@@ -25,6 +25,7 @@ import { AdminAnalyticsPage } from '@/pages/admin/admin-analytics-page'
 import { AuditLogPage } from '@/pages/admin/audit-log-page'
 import { AdminToolsPage } from '@/pages/admin/admin-tools'
 import { ProfilePage } from '@/pages/auth/profile-page'
+import { IncentivePage } from '@/pages/incentive/incentive-page'
 import { useAuthStore } from '@/stores/auth-store'
 import { useThemeStore } from '@/stores/theme-store'
 import { store } from '@/store'
@@ -141,6 +142,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute roles={['sales_head', 'admin']}>
               <QueuePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="incentive"
+          element={
+            <ProtectedRoute roles={['sales_rep']}>
+              <IncentivePage />
             </ProtectedRoute>
           }
         />

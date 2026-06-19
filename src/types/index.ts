@@ -238,6 +238,14 @@ export interface OrderDispatch {
   payment_received_remarks: string
 }
 
+export interface OrderIncentiveDetails {
+  aicera_invoice_date: string
+  customer_payment_terms: string
+  aicera_payment_terms: string
+  customer_payment_date: string
+  payment_received: boolean
+}
+
 export interface Order {
   id: string
   order_number: string
@@ -269,4 +277,7 @@ export interface Order {
   // Workflow Checklist & Dispatch
   checklist: OrderChecklist
   dispatch: OrderDispatch
+
+  // Incentive Details (manually added by sales rep once checklist is complete)
+  incentive_details?: OrderIncentiveDetails | null
 }
